@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint setup.sh
+        run: |
+          bash -n setup.sh
+          shellcheck setup.sh
+
+      - name: Run setup script
+        run: ./setup.sh
+
+      - name: Verify dependencies are consistent
+        run: .venv/bin/python -m pip check
