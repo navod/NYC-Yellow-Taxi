@@ -16,8 +16,16 @@ jobs:
           bash -n setup.sh
           shellcheck setup.sh
 
+      - name: Cache raw data
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: nyc-taxi-raw-${{ hashFiles('setup.sh') }}
+
       - name: Run setup script
         run: ./setup.sh
+        env:
+          MONTHS: "2023-01"
 
       - name: Verify dependencies are consistent
         run: .venv/bin/python -m pip check

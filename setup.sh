@@ -6,6 +6,9 @@ set -Eeuo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
+MONTHS="${MONTHS:-2023-01 2023-02}"
+BASE_URL="https://d37ci6vzurychx.cloudfront.net"
+RAW_DIR="data/raw"
 VENV_DIR=".venv"
 
 log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
@@ -47,10 +50,35 @@ create_venv() {
     fi
 }
 
+download() {
+    local url="$1" dest="$2"
+    if [[ -s "$dest" ]]; then
+        log "Already downloaded: $dest"
+        return
+    fi
+    log "Downloading $url"
+    curl --fail --location --silent --show-error \
+         --retry 3 --retry-delay 5 \
+         --output "$dest.part" "$url"
+    mv "$dest.part" "$dest"
+    log "Saved $dest ($(du -h "$dest" | cut -f1))"
+}
+
+download_data() {
+    mkdir -p "$RAW_DIR" data/clean logs
+    download "$BASE_URL/misc/taxi_zone_lookup.csv" "$RAW_DIR/taxi_zone_lookup.csv"
+    for month in $MONTHS; do
+        [[ "$month" =~ ^[0-9]{4}-[0-9]{2}$ ]] || fail "Invalid month '$month' (expected YYYY-MM)"
+        download "$BASE_URL/trip-data/yellow_tripdata_${month}.parquet" \
+                 "$RAW_DIR/yellow_tripdata_${month}.parquet"
+    done
+}
+
 main() {
     log "Setup started"
     check_prerequisites
     create_venv
+    download_data
 
     log "Setup finished"
     cat <<EOF
