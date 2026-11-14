@@ -29,3 +29,17 @@ jobs:
 
       - name: Verify dependencies are consistent
         run: .venv/bin/python -m pip check
+
+      - name: Verify databases were created
+        run: |
+          set -a; source .env; set +a
+          docker compose exec -T postgres psql -U "$DW_USER" -d "$DW_DB" -Atc 'select 1'
+          docker compose exec -T postgres psql -U postgres -Atc "select datname from pg_database" | grep -qx superset
+
+      - name: Show Postgres logs on failure
+        if: failure()
+        run: docker compose logs postgres
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

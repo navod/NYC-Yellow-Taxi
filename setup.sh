@@ -74,12 +74,21 @@ download_data() {
     done
 }
 
+start_services() {
+    if [[ ! -f .env ]]; then
+        cp .env.example .env
+        log "Created .env from .env.example"
+    fi
+    log "Building and starting PostgreSQL (first run pulls images)"
+    docker compose up --detach --build --wait
+}
+
 main() {
     log "Setup started"
     check_prerequisites
     create_venv
     download_data
-
+    start_services
     log "Setup finished"
     cat <<EOF
 
