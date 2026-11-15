@@ -11,10 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lint setup.sh
+      - name: Lint shell scripts
         run: |
-          bash -n setup.sh
-          shellcheck setup.sh
+          bash -n scripts/*.sh
+          shellcheck scripts/*.sh
 
       # docker-compose.yml requires these; generate throwaway values for this run only.
       - name: Generate CI passwords
@@ -28,11 +28,11 @@ jobs:
       - name: Cache raw data
         uses: actions/cache@v4
         with:
-          path: data/raw
-          key: nyc-taxi-raw-${{ hashFiles('setup.sh') }}
+          path: data/input
+          key: nyc-taxi-raw-${{ hashFiles('scripts/setup.sh') }}
 
       - name: Run setup script
-        run: ./setup.sh
+        run: ./scripts/setup.sh
         env:
           MONTHS: "2023-01"
 
@@ -40,7 +40,7 @@ jobs:
         run: .venv/bin/python -m pip check
 
       - name: Run tests
-        run: .venv/bin/python -m pytest -q
+        run: ./scripts/run_tests.sh -q
 
       - name: Verify databases were created
         run: |

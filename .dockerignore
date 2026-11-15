@@ -1,0 +1,14 @@
+# Keep the Docker build context small: only requirements/ is copied into images.
+.git
+.github
+.venv
+.claude
+.env
+.env.*
+data/
+logs/
+notebooks/
+docs/
+**/__pycache__
+**/*.pyc
+.pytest_cache

@@ -3,5 +3,12 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data/
-logs/
+.ipynb_checkpoints/
+
+# Runtime data and logs stay local; only the folder skeleton is versioned.
+data/input/*
+data/output/*
+logs/*
+!data/input/.gitkeep
+!data/output/.gitkeep
+!logs/.gitkeep

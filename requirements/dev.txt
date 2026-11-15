@@ -1,0 +1,4 @@
+# Local development: tests and notebooks. Installed by scripts/setup.sh.
+-r base.txt
+pytest>=8
+ipykernel>=6
