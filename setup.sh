@@ -96,6 +96,8 @@ Next steps:
   source $VENV_DIR/bin/activate
   Airflow UI   : http://localhost:${AIRFLOW_PORT:-8081}   (unpause the 'nyc_taxi_etl' DAG)
   Run pipeline : docker compose exec airflow-scheduler airflow dags unpause nyc_taxi_etl
+  Superset     : http://localhost:${SUPERSET_PORT:-8088}/superset/dashboard/nyc-taxi/   (login ${SUPERSET_ADMIN_USER:-admin} / ${SUPERSET_ADMIN_PASSWORD:-admin})
+
   Tests        : $VENV_DIR/bin/pytest
 EOF
 }
