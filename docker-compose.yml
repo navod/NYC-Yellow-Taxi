@@ -15,12 +15,12 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     # Local demo only: skip the login screen, every visitor is an admin.
     AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://airflow:airflow@postgres/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://airflow:${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}@postgres/airflow
     # Airflow 3: tasks talk to the API server, not straight to the metadata DB.
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
-    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-l0bbffdb99eaf264097f71f020eee4b20919274402f28b21d81dd59e45c854181}
-    # Warehouse connection, exposed to DAGs as the Airflow Connection "taxi_dw".
-    AIRFLOW_CONN_TAXI_DW: postgresql://${DW_USER:-dw_user}:${DW_PASSWORD:-dw_password}@postgres:5432/${DW_DB:-taxi_dw}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?set AIRFLOW_JWT_SECRET in .env}
+    # Warehouse connection, exposed to DAGs as the Airflow Connection "nyc_taxi_dw" (must match WAREHOUSE_CONN_ID).
+    AIRFLOW_CONN_NYC_TAXI_DW: postgresql://${DW_USER:-dw_user}:${DW_PASSWORD:-dw_password}@postgres:5432/${DW_DB:-taxi_dw}
     # Pipeline settings read by etl/config.py
     PROJECT_ROOT: /opt/airflow/project
     PYTHONPATH: /opt/airflow/project
@@ -41,7 +41,8 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${DW_PASSWORD:?set DW_PASSWORD in .env}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?set AIRFLOW_DB_PASSWORD in .env}
       POSTGRES_DB: postgres
       DW_USER: ${DW_USER}
       DW_PASSWORD: ${DW_PASSWORD}

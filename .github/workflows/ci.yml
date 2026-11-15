@@ -16,6 +16,15 @@ jobs:
           bash -n setup.sh
           shellcheck setup.sh
 
+      # docker-compose.yml requires these; generate throwaway values for this run only.
+      - name: Generate CI passwords
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "AIRFLOW_DB_PASSWORD=$(openssl rand -hex 16)"
+            echo "AIRFLOW_JWT_SECRET=$(openssl rand -hex 32)"
+          } >> "$GITHUB_ENV"
+
       - name: Cache raw data
         uses: actions/cache@v4
         with:
@@ -29,6 +38,9 @@ jobs:
 
       - name: Verify dependencies are consistent
         run: .venv/bin/python -m pip check
+
+      - name: Run tests
+        run: .venv/bin/python -m pytest -q
 
       - name: Verify databases were created
         run: |

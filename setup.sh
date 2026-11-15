@@ -95,6 +95,8 @@ main() {
 Next steps:
   source $VENV_DIR/bin/activate
   Airflow UI   : http://localhost:${AIRFLOW_PORT:-8081}   (unpause the 'nyc_taxi_etl' DAG)
+  Run pipeline : docker compose exec airflow-scheduler airflow dags unpause nyc_taxi_etl
+  Tests        : $VENV_DIR/bin/pytest
 EOF
 }
 
