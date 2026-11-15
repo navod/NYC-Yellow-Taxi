@@ -79,7 +79,7 @@ start_services() {
         cp .env.example .env
         log "Created .env from .env.example"
     fi
-    log "Building and starting PostgreSQL (first run pulls images)"
+    log "Building and starting PostgreSQL and Airflow (first run pulls images)"
     docker compose up --detach --build --wait
 }
 
@@ -94,6 +94,7 @@ main() {
 
 Next steps:
   source $VENV_DIR/bin/activate
+  Airflow UI   : http://localhost:${AIRFLOW_PORT:-8081}   (unpause the 'nyc_taxi_etl' DAG)
 EOF
 }
 

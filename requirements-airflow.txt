@@ -1,0 +1,4 @@
+# Extra packages for the Airflow image, on top of what apache/airflow ships.
+pandas
+pyarrow
+psycopg[binary]
