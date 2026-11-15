@@ -1,0 +1,5 @@
+# Core runtime dependencies of the ETL code in src/.
+pandas>=2.2
+python-dotenv>=1.0
+pyarrow>=16
+psycopg[binary]>=3.2

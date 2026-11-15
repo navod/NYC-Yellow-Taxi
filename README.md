@@ -10,9 +10,9 @@ Covers **Assignment 1** (Batch ETL, Data Modeling, SQL, Python, Local Orchestrat
 
 ```
  TLC CloudFront (parquet)
-        |  curl (setup.sh)  /  urllib (etl/extract.py)
+        |  curl (scripts/setup.sh)  /  urllib (src/extract/fetch_data.py)
         v
- data/raw/*.parquet
+ data/input/*.parquet
         |
         v                       Airflow DAG: nyc_taxi_etl  (one run = one month)
  +-------------------------------------------------------------------------+
@@ -37,7 +37,7 @@ Covers **Assignment 1** (Batch ETL, Data Modeling, SQL, Python, Local Orchestrat
 | Storage | PostgreSQL 16 (one instance: Airflow metadata, Superset metadata, warehouse) |
 | ETL | Python 3.12, pandas, psycopg 3 (bulk `COPY`) |
 | Dashboard | Apache Superset 6.1 |
-| Packaging | Docker Compose, `setup.sh` |
+| Packaging | Docker Compose, `Makefile`, `scripts/setup.sh` |
 
 ### Data model (`sql/schema.sql`)
 
@@ -59,7 +59,7 @@ Grain of the fact table: **one row per completed taxi trip**.
 | Bulk `COPY` into UNLOGGED staging | About 3M rows per month loads in roughly a minute. |
 | Post-load quality checks | Fail the run if the fact is empty, row count differs from staging (silent join drops), measures are invalid, or too many payment types are Unknown. |
 | `summarise_run` runs with `trigger_rule=all_done` and fails if any step failed | Airflow derives run state from leaf tasks, so without this a run with a failed step could show as success. |
-| Analytics SQL lives in `sql/analytics/*.sql` | Superset datasets are built from these same files, so SQL is version controlled and reviewable. |
+| Analytics SQL lives in `sql/reporting/*.sql` | Superset datasets are built from these same files, so SQL is version controlled and reviewable. |
 
 ## Assumptions
 
@@ -82,20 +82,20 @@ Grain of the fact table: **one row per completed taxi trip**.
 Prerequisites: Docker with Compose v2, `curl`, and `uv` or Python 3.10+.
 
 ```bash
-./setup.sh                      # venv, dependencies, data download, docker compose up
+make setup                      # venv, dependencies, data download, docker compose up
 ```
 
-`setup.sh` copies `.env.example` to `.env` if there is none. **Edit `.env` and set real
+`scripts/setup.sh` copies `.env.example` to `.env` if there is none. **Edit `.env` and set real
 passwords and `SUPERSET_SECRET_KEY` before first start** (e.g. `openssl rand -base64 42`).
 
 Then:
 
 ```bash
 # 1. Unpause the DAG; the scheduler runs the months inside the DAG window
-docker compose exec airflow-scheduler airflow dags unpause nyc_taxi_etl
+make unpause
 
 # 2. Create the Superset database connection, datasets, charts and dashboard (idempotent)
-docker compose exec -T superset python /app/bootstrap/bootstrap_dashboard.py
+make dashboard
 ```
 
 | Service | URL |
@@ -115,7 +115,7 @@ logical date, so the run for month M fires on the first day of month M+1 only if
 
 ## Monitoring and logging
 
-- **Structured logging:** `etl/utils/logging_utils.py` emits JSON log lines with run id, data month, row counts and errors (also to `pipeline.jsonl` in `ETL_LOG_DIR`, e.g. `tail -f logs/etl/pipeline.jsonl | jq`).
+- **Structured logging:** `src/config/logging_config.py` emits JSON log lines with run id, data month, row counts and errors (also to `pipeline.jsonl` in `ETL_LOG_DIR`, e.g. `tail -f logs/etl/pipeline.jsonl | jq`).
 - **Audit table:** every step writes status, start/end, duration, `rows_in`, `rows_out`, `rows_rejected`, per-rule reject counts and the error message to `dw.etl_run_audit`. The dashboard shows it.
 - **Error handling:** explicit exceptions (`SchemaError`, `DataQualityError`); retries with exponential backoff (`TASK_RETRIES`, default 2) and an execution timeout per task.
 - **Alerts:** `on_failure_callback` sends a Slack-compatible webhook message if `ALERT_WEBHOOK_URL` is set; `on_retry_callback` logs each retry.
@@ -124,35 +124,62 @@ logical date, so the run for month M fires on the first day of month M+1 only if
 
 | Metric | File |
 |---|---|
-| Average fare per mile (overall, by month, by pickup borough) | `sql/analytics/avg_fare_per_mile*.sql` |
-| Peak hours for rides | `sql/analytics/peak_hours.sql` |
-| Total revenue by payment type | `sql/analytics/revenue_by_payment_type.sql` |
-| KPI tiles (trips, revenue, avg fare per mile, avg distance) | `sql/analytics/kpi_summary.sql` |
-| Pipeline run history | `sql/analytics/pipeline_runs.sql` |
+| Average fare per mile (overall, by month, by pickup borough) | `sql/reporting/avg_fare_per_mile*.sql` |
+| Peak hours for rides | `sql/reporting/peak_hours.sql` |
+| Total revenue by payment type | `sql/reporting/revenue_by_payment_type.sql` |
+| KPI tiles (trips, revenue, avg fare per mile, avg distance) | `sql/reporting/kpi_summary.sql` |
+| Pipeline run history | `sql/reporting/pipeline_runs.sql` |
 
 ## Repository layout
 
 ```
-setup.sh                     one-shot setup (Task 1)
-sql/schema.sql               star schema (Task 2)
-sql/transform/               dimension and fact load SQL
-sql/analytics/               dashboard queries (Task 5)
-dag/nyc_taxi_etl.py          Airflow DAG (Task 3)
-etl/                         extract, clean, load, quality, audit, alerts, logging (Tasks 3-4)
+Makefile                     common tasks: make setup | up | down | test | docs | dashboard (make help)
+.env.example                 configuration template, copied to .env by setup
+.dockerignore                keeps data/, logs/ and .venv out of the Docker build context
+data/
+  input/                     raw TLC parquet files and zone lookup (downloaded)
+  output/                    cleaned parquet files, one per month
+Docker/
+  Dockerfile_airflow         Airflow image + requirements/prod.txt
+  Dockerfile_superset        Superset image + PostgreSQL driver
+docker-compose.yml           Postgres, Airflow, Superset
+dags/nyc_taxi_etl.py         Airflow DAG (Task 3)
+docs/                        technical docs: deployment, ETL flow, business rules, ER diagram, data dictionary
+logs/                        Airflow task logs and logs/etl/pipeline.jsonl (runtime)
+notebooks/main.ipynb         raw data exploration
+requirements/                base.txt (runtime), dev.txt (+ pytest, ipykernel), prod.txt (Airflow image)
+scripts/
+  setup.sh                   one-shot setup (Task 1)
+  run_tests.sh               run the test suite
+  init-databases.sh          Postgres first-start hook: creates the databases
+  generate_data_dictionary.py  builds docs/schema/data_dictionary.csv from sql/schema.sql
+sql/
+  schema.sql                 star schema (Task 2)
+  seed_dimensions.sql        static dimension rows
+  queries/                   dimension and fact load SQL
+  reporting/                 dashboard queries (Task 5)
+src/                         ETL code (Tasks 3-4)
+  config/                    settings.py (all settings), logging_config.py (JSON logging)
+  db_connection/             postgres.py (connections), reader.py (run SQL files)
+  extract/fetch_data.py      download and validate raw files
+  transform/clean_trips.py   cleaning rules with per-rule reject counts
+  load/load_to_db.py         COPY into staging, dimension and fact loads
+  quality/checks.py          post-load data quality checks
+  schema/trips.py            column contract shared with the DDL
+  utils/                     audit.py (dw.etl_run_audit), alerts.py (failure webhook)
 superset/                    Superset config and dashboard-as-code bootstrap
-docker/                      Dockerfiles and Postgres init script
-test/                        unit tests: cleaning rules, DAG integrity, schema consistency
+tests/                       unit tests: cleaning rules, DAG integrity, schema consistency
 ```
 
-Run the tests with `.venv/bin/pytest`.
+Run the tests with `make test`. More detail is in [docs/](docs/README.md).
 
 ## Demo script (about 10 minutes)
 
 Stage by stage, so it still works if not everything runs at once.
 
 **1. Setup (Task 1) - 1 min**
-- Show [setup.sh](setup.sh): venv creation, `curl` downloads with retry and `.part` rename, `docker compose up --wait`.
-- `ls data/raw` shows two monthly parquet files and the zone lookup.
+- Show [scripts/setup.sh](scripts/setup.sh): venv creation, `curl` downloads with retry and `.part` rename, `docker compose up --wait`.
+- `ls data/input` shows two monthly parquet files and the zone lookup.
 - `docker compose ps` shows Postgres, Airflow and Superset healthy.
 
 **2. Data model (Task 2) - 2 min**
@@ -161,8 +188,8 @@ Stage by stage, so it still works if not everything runs at once.
 
 **3. Pipeline (Task 3) - 3 min**
 - In the Airflow UI open `nyc_taxi_etl`, show the graph and a successful run.
-- Walk through [etl/clean.py](etl/clean.py): the ordered rules and per-rule reject counts.
-- Show [etl/load.py](etl/load.py) `load_fact`: create partition, truncate, insert, which makes reruns idempotent.
+- Walk through [src/transform/clean_trips.py](src/transform/clean_trips.py): the ordered rules and per-rule reject counts.
+- Show [src/load/load_to_db.py](src/load/load_to_db.py) `load_fact`: create partition, truncate, insert, which makes reruns idempotent.
 - Prove idempotency: clear the 2023-02 run, and show the fact row count for February is unchanged:
   ```sql
   SELECT to_char(pickup_ts,'YYYY-MM') AS month, count(*) FROM dw.fact_taxi_trips GROUP BY 1 ORDER BY 1;
@@ -173,12 +200,12 @@ Stage by stage, so it still works if not everything runs at once.
 - `SELECT step, status, duration_s, rows_in, rows_out, rows_rejected FROM dw.etl_run_audit ORDER BY started_at DESC LIMIT 10;`
 - Show the February reject breakdown:
   `SELECT details->'rejects_by_rule' FROM dw.etl_run_audit WHERE step='clean' AND data_month='2023-02' ORDER BY started_at DESC LIMIT 1;`
-- Show [etl/quality.py](etl/quality.py) and the failure and retry callbacks in the DAG.
+- Show [src/quality/checks.py](src/quality/checks.py) and the failure and retry callbacks in the DAG.
 - **Failure demo:** set `MAX_TRIP_MILES=0` temporarily or point `TLC_BASE_URL` at a bad URL, trigger a run, and show the failed task, the retry log, the audit row with `error_message`, and `summarise_run` failing the run. Revert afterwards.
 
 **5. Dashboard (Task 5) - 2 min**
 - Open the Superset dashboard: KPI tiles, peak hours, revenue by payment type, fare per mile by borough and by month, pipeline runs table.
-- Open one chart's SQL and show it is the file in `sql/analytics/`.
+- Open one chart's SQL and show it is the file in `sql/reporting/`.
 
 ### Questions to be ready for
 

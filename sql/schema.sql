@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS dw.dim_payment_type (
 -- Partitioned by month on pickup time:
 --   * queries filtered by date only scan the months they need
 --   * a pipeline re-run replaces exactly one partition (idempotent loads)
--- Monthly partitions are created by the pipeline (etl/load.py).
+-- Monthly partitions are created by the pipeline (src/load/load_to_db.py).
 CREATE TABLE IF NOT EXISTS dw.fact_taxi_trips (
     trip_id               BIGINT        GENERATED ALWAYS AS IDENTITY,
 

@@ -6,7 +6,7 @@ x-airflow-common:
   image: nyc-taxi-airflow:3.4.0
   build: 
     context: .
-    dockerfile: docker/airflow/Dockerfile
+    dockerfile: Docker/Dockerfile_airflow
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment:
@@ -21,13 +21,13 @@ x-airflow-common:
     AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?set AIRFLOW_JWT_SECRET in .env}
     # Warehouse connection, exposed to DAGs as the Airflow Connection "nyc_taxi_dw" (must match WAREHOUSE_CONN_ID).
     AIRFLOW_CONN_NYC_TAXI_DW: postgresql://${DW_USER:-dw_user}:${DW_PASSWORD:-dw_password}@postgres:5432/${DW_DB:-taxi_dw}
-    # Pipeline settings read by etl/config.py
+    # Pipeline settings read by src/config/settings.py
     PROJECT_ROOT: /opt/airflow/project
     PYTHONPATH: /opt/airflow/project
     ETL_LOG_DIR: /opt/airflow/logs/etl
     ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
   volumes:
-    - ./dag:/opt/airflow/dags
+    - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
     - .:/opt/airflow/project
   user: "${AIRFLOW_UID:-50000}:0"
@@ -51,7 +51,7 @@ services:
       - "${DW_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+      - ./scripts/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -100,7 +100,8 @@ services:
 
   superset:
     build:
-      context: docker/superset
+      context: Docker
+      dockerfile: Dockerfile_superset
     image: nyc-taxi-superset:6.1.0
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:?set SUPERSET_SECRET_KEY in .env}

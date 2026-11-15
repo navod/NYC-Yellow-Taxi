@@ -1,12 +1,12 @@
 """Create the Superset dashboard through Superset's REST API (dashboard as code).
 
-Run inside the Superset container (setup.sh does this):
+Run inside the Superset container (or: make dashboard):
 
     docker compose exec superset python /app/bootstrap/bootstrap_dashboard.py
 
 What it builds:
   1. a database connection to the taxi warehouse
-  2. one virtual dataset per file in sql/analytics/ - the same SQL the
+  2. one virtual dataset per file in sql/reporting/ - the same SQL the
      Streamlit dashboard runs, so both dashboards always agree
   3. charts on top of those datasets
   4. a single dashboard that lays the charts out
@@ -28,7 +28,7 @@ SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088")
 ADMIN_USER = os.environ["SUPERSET_ADMIN_USER"]
 ADMIN_PASSWORD = os.environ["SUPERSET_ADMIN_PASSWORD"]
 WAREHOUSE_URI = os.environ["WAREHOUSE_SQLALCHEMY_URI"]
-ANALYTICS_SQL_DIR = Path(os.environ.get("ANALYTICS_SQL_DIR", "/app/sql/analytics"))
+ANALYTICS_SQL_DIR = Path(os.environ.get("ANALYTICS_SQL_DIR", "/app/sql/reporting"))
 
 DATABASE_NAME = "Taxi Warehouse"
 DASHBOARD_TITLE = "NYC Yellow Taxi - Trip Analytics"
